@@ -1,22 +1,21 @@
 use v6;
 use JSON::Tiny;
 
-my $fileName = "supergirl.s02.dat";
+class Config {
+	has $!fileName = ".config";
+	has %.sitcoms is rw;
 
-say "ARGS: ", @*ARGS;
 
-sub load {
-	my %config = from-json(slurp ".config");
-	return %config;
+	method load {
+		self.sitcoms = from-json(slurp $!fileName);
+	}
+
+	method save {
+		my $fh = open $!fileName, :w;
+		$fh.say(to-json(self.sitcoms));
+		$fh.close;
+	}
 }
-
-sub save(%config!) {
-	my $fh = open ".config", :w;
-	$fh.say(to-json(%config));
-	$fh.close;
-}
-my %config = load;
-
 
 sub parseFile($fileName!) {
 	my %episodes;
@@ -52,34 +51,44 @@ grammar Sitcom {
 }
 
 class SitcomActions {
+	has Config $!config;
+
+	submethod BUILD {
+		$!config = Config.new;
+		$!config.load;
+	}
+
 	method TOP($/)                { make $<sitcom>.made; }
 	method sitcom:sym<add>($/)    { self.add(Str($<name>),Str($<fileName>)); }
 	method sitcom:sym<last>($/)   { self.last(Str($<name>),Int($<ep>)); }
 	method sitcom:sym<list>($/)   { self.list; }  
-	method sitcom:sym<report>($/) { self.report(Str($<name>)) }
+	method sitcom:sym<report>($/) { self.report($<name>) }
 
 	method add(Str $name, Str $fileName) { 
-		%config{$name}{'episodes'} = parseFile($fileName);
+		$!config.sitcoms{$name}{'episodes'} = parseFile($fileName);
 	}
 
 	method last(Str $name, Int $ep) { 
-		%config{$name}{'ep'} = $ep;
+		$!config.sitcoms{$name}{'ep'} = $ep;
 	}
 
 	method list {
-		say %config.keys;
+		say $!config.sitcoms.keys;
 	}
 
-	method report(Str $name?) {
+	method report($name?) {
 		if defined($name)  {
-			say %config{$name};
+			say $!config.sitcoms{$name};
 		} else {
-			say %config;
+			say $!config.sitcoms;
 		}
+	}
+
+	method epilog {
+		$!config.save;
 	}
 }
 
-say Sitcom.parse(@*ARGS.join(" "), actions => SitcomActions).made;
-
-save(%config);
-
+my $sa = SitcomActions.new;
+Sitcom.parse(@*ARGS.join(" "), actions => $sa).made;
+$sa.epilog;
