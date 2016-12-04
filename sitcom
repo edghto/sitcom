@@ -1,0 +1,25 @@
+use JSON::Tiny;
+
+my $fileName = "supergirl.s02.dat";
+
+say @*ARGS;
+
+sub getData($fileName!) {
+	my @episodes;
+	my @lines = (open $fileName).lines;
+	while @lines {
+		my $elem = @lines.shift;
+		if $elem ~~ m/S(\d+)\,\s+Ep(\d+)/ {
+			say "$0 $1";
+			while @lines {
+				$elem = @lines.shift;
+				if $elem ~~ m/\d+ \s+ \w+\. \s+ \d\d\d\d/ {
+					say $/;
+					last;
+				}
+			}
+		}
+	}
+}
+
+getData($fileName);
