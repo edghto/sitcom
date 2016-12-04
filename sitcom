@@ -1,3 +1,5 @@
+#!/usr/bin/env perl6
+
 use v6;
 use JSON::Tiny;
 
@@ -36,6 +38,33 @@ sub parseFile($fileName!) {
 	return %episodes;
 }
 
+sub prettyDump(%sitcoms) {
+	my $nameLen     = [max] %sitcoms.keys>>.chars;
+	my $maxEpisodes = [max] %sitcoms.values>>{'episodes'}>>.elems;
+	my $maxDateLen  = 12; #[max] %sitcoms.values>>{'episodes'}>>.values>>.chars;
+	my $num         = ($maxDateLen > $nameLen ?? $maxDateLen !! $nameLen);
+	my $format      = '%s %02d %-' ~ $num ~ 's  ';
+
+	my @names = %sitcoms.keys;
+	my $headerFormat = '  %-' ~ 4+ $num ~ 's ';
+
+	printf $headerFormat x @names.elems , |@names;
+	say();
+	for (1..$maxEpisodes) -> $i {
+		for %sitcoms.keys -> $name {
+			if defined %sitcoms{$name}{'episodes'}{$i} {
+				my $isLast = %sitcoms{$name}{'ep'} == $i??'*'!!' ';
+				my $entry  = %sitcoms{$name}{'episodes'}{$i};
+				printf $format, $isLast, $i, $entry
+			}
+			else {
+				print ' ' x $num+7;
+			}
+		}
+		say();
+	}
+}
+
 grammar Sitcom {
 	rule TOP       { <sitcom> }
 
@@ -62,7 +91,9 @@ class SitcomActions {
 	method sitcom:sym<add>($/)    { self.add(Str($<name>),Str($<fileName>)); }
 	method sitcom:sym<last>($/)   { self.last(Str($<name>),Int($<ep>)); }
 	method sitcom:sym<list>($/)   { self.list; }  
-	method sitcom:sym<report>($/) { self.report($<name>) }
+	method sitcom:sym<report>($/) { self.report($<name>); }
+
+	method name($/) { defined($!config.sitcoms{$/})||exit; }
 
 	method add(Str $name, Str $fileName) { 
 		$!config.sitcoms{$name}{'episodes'} = parseFile($fileName);
@@ -73,14 +104,15 @@ class SitcomActions {
 	}
 
 	method list {
-		say $!config.sitcoms.keys;
+		say $!config.sitcoms.keys.join("\n");
 	}
 
 	method report($name?) {
 		if defined($name)  {
-			say $!config.sitcoms{$name};
+			my %tmp = $name => $!config.sitcoms{$name};
+			prettyDump %tmp;
 		} else {
-			say $!config.sitcoms;
+			prettyDump $!config.sitcoms;
 		}
 	}
 
