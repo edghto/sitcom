@@ -5,8 +5,20 @@ my $fileName = "supergirl.s02.dat";
 
 say "ARGS: ", @*ARGS;
 
+sub load {
+	my %config = from-json(slurp ".config");
+	return %config;
+}
 
-sub getData($fileName!) {
+sub save(%config!) {
+	my $fh = open ".config", :w;
+	$fh.say(to-json(%config));
+	$fh.close;
+}
+my %config = load;
+
+
+sub parseFile($fileName!) {
 	my %episodes;
 	my @lines = (open $fileName).lines;
 	while @lines {
@@ -25,43 +37,49 @@ sub getData($fileName!) {
 	return %episodes;
 }
 
-sub load {
-	my %config = from-json(slurp ".config");
-	return %config;
+grammar Sitcom {
+	rule TOP       { <sitcom> }
+
+	proto rule sitcom             {*}
+	      rule sitcom:sym<add>    { 'add' <name> <fileName> }
+	      rule sitcom:sym<last>   { 'last' <name> <ep> }
+	      rule sitcom:sym<list>   { 'list' }
+	      rule sitcom:sym<report> { 'report' <name>? }
+
+	token name     { [ \w | _ ]+ }
+	token fileName { [ \w | _ | . ] + }
+	token ep       { \d+ }
 }
 
-sub save(%config!) {
-	my $fh = open ".config", :w;
-	$fh.say(to-json(%config));
-	$fh.close;
-}
+class SitcomActions {
+	method TOP($/)                { make $<sitcom>.made; }
+	method sitcom:sym<add>($/)    { self.add(Str($<name>),Str($<fileName>)); }
+	method sitcom:sym<last>($/)   { self.last(Str($<name>),Int($<ep>)); }
+	method sitcom:sym<list>($/)   { self.list; }  
+	method sitcom:sym<report>($/) { self.report(Str($<name>)) }
 
-my %config = load;
+	method add(Str $name, Str $fileName) { 
+		%config{$name}{'episodes'} = parseFile($fileName);
+	}
 
-my %fun = 
-	add    => sub { 
-		my $name = @*ARGS.shift;
-		%config{$name}{'episodes'} = getData($fileName);
-	},
-	last   => sub { 
-		my $name = @*ARGS.shift;
-		my $ep   = @*ARGS.shift;
+	method last(Str $name, Int $ep) { 
 		%config{$name}{'ep'} = $ep;
-	},
-	list => sub {
+	}
+
+	method list {
 		say %config.keys;
-	},
-	report => sub {
-		if @*ARGS.elems  {
-			my $name = @*ARGS.shift;
+	}
+
+	method report(Str $name?) {
+		if defined($name)  {
 			say %config{$name};
-		}
-		else {
+		} else {
 			say %config;
 		}
-	};
+	}
+}
 
-%fun{@*ARGS.shift}();
+say Sitcom.parse(@*ARGS.join(" "), actions => SitcomActions).made;
 
 save(%config);
 
