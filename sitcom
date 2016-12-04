@@ -1,25 +1,67 @@
+use v6;
 use JSON::Tiny;
 
 my $fileName = "supergirl.s02.dat";
 
-say @*ARGS;
+say "ARGS: ", @*ARGS;
+
 
 sub getData($fileName!) {
-	my @episodes;
+	my %episodes;
 	my @lines = (open $fileName).lines;
 	while @lines {
 		my $elem = @lines.shift;
 		if $elem ~~ m/S(\d+)\,\s+Ep(\d+)/ {
-			say "$0 $1";
+			my $ep = $1;
 			while @lines {
 				$elem = @lines.shift;
 				if $elem ~~ m/\d+ \s+ \w+\. \s+ \d\d\d\d/ {
-					say $/;
+					%episodes{$ep} = Str($/);
 					last;
 				}
 			}
 		}
 	}
+	return %episodes;
 }
 
-getData($fileName);
+sub load {
+	my %config = from-json(slurp ".config");
+	return %config;
+}
+
+sub save(%config!) {
+	my $fh = open ".config", :w;
+	$fh.say(to-json(%config));
+	$fh.close;
+}
+
+my %config = load;
+
+my %fun = 
+	add    => sub { 
+		my $name = @*ARGS.shift;
+		%config{$name}{'episodes'} = getData($fileName);
+	},
+	last   => sub { 
+		my $name = @*ARGS.shift;
+		my $ep   = @*ARGS.shift;
+		%config{$name}{'ep'} = $ep;
+	},
+	list => sub {
+		say %config.keys;
+	},
+	report => sub {
+		if @*ARGS.elems  {
+			my $name = @*ARGS.shift;
+			say %config{$name};
+		}
+		else {
+			say %config;
+		}
+	};
+
+%fun{@*ARGS.shift}();
+
+save(%config);
+
