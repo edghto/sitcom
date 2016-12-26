@@ -9,7 +9,9 @@ class Config {
 
 
 	method load {
-		self.sitcoms = from-json(slurp $!fileName);
+		if $!fileName.IO.e {
+			self.sitcoms = from-json($!fileName.IO.slurp);
+		}
 	}
 
 	method save {
@@ -53,7 +55,7 @@ sub prettyDump(%sitcoms) {
 	for (1..$maxEpisodes) -> $i {
 		for %sitcoms.keys -> $name {
 			if defined %sitcoms{$name}{'episodes'}{$i} {
-				my $isLast = %sitcoms{$name}{'ep'} == $i??'*'!!' ';
+				my $isLast = defined(%sitcoms{$name}{'ep'}) && %sitcoms{$name}{'ep'} == $i??'*'!!' ';
 				my $entry  = %sitcoms{$name}{'episodes'}{$i};
 				printf $format, $isLast, $i, $entry
 			}
@@ -92,8 +94,6 @@ class SitcomActions {
 	method sitcom:sym<last>($/)   { self.last(Str($<name>),Int($<ep>)); }
 	method sitcom:sym<list>($/)   { self.list; }  
 	method sitcom:sym<report>($/) { self.report($<name>); }
-
-	method name($/) { defined($!config.sitcoms{$/})||exit; }
 
 	method add(Str $name, Str $fileName) { 
 		$!config.sitcoms{$name}{'episodes'} = parseFile($fileName);
